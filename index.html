@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cidade Enlameada</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f7f6f2;color:#242820;font-family:system-ui,-apple-system,sans-serif}main{max-width:920px;margin:auto;padding:28px 24px 20px}header{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}h1{font-size:26px;letter-spacing:-1px;margin:0;font-weight:650}.hint{font-size:14px;color:#62675e;margin:8px 0 0}.stats{display:flex;gap:28px;align-items:center}.total{font-size:34px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1}.unit{font-size:13px;color:#62675e}.connection{font-size:14px;max-width:255px;padding:11px 14px;border-radius:10px;background:#e9ebe5;border:1px solid #d7dbd0;line-height:1.4}#map{display:block;width:100%;height:auto;max-height:70vh;margin:8px 0}.road{stroke:#b5b8ae;stroke-width:3;stroke-linecap:round}.selected .road{stroke:#24704c;stroke-width:7}.hit{stroke:transparent;stroke-width:27;cursor:pointer;fill:none}.edge:focus{outline:none}.edge:focus-visible .road{stroke:#b36a14;stroke-width:7}.cost-bg{fill:#f7f6f2}.cost{fill:#3b4137;font:600 17px system-ui;pointer-events:none;text-anchor:middle;dominant-baseline:central}.selected .cost{fill:#165838}.house{fill:#fff;stroke:#454d40;stroke-width:1.6}.letter{fill:#252e21;font:600 18px system-ui;text-anchor:middle;dominant-baseline:central}.node{pointer-events:none}.actions{display:flex;justify-content:space-between;align-items:center;gap:12px}button{font:inherit;font-size:14px;padding:10px 17px;border:1px solid #c9cec2;border-radius:9px;background:transparent;color:#333d2b;cursor:pointer}button:hover{background:#e9ede3}button:focus-visible{outline:3px solid #b36a14;outline-offset:3px}#solution{border:0}.connected{color:#145331;font-weight:650;background:#e0f1e5;border-color:#79ad88}@media(max-width:550px){main{padding:20px 12px}header{gap:20px}h1{font-size:23px}.stats{width:100%;justify-content:space-between}.connection{max-width:none}#map{max-height:none}.cost{font-size:20px}.letter{font-size:21px}}@media print{.actions,.hint{display:none}body{background:white}#map{max-height:none}}
+
+.versions{display:flex;gap:8px;margin-top:20px}.versions button[aria-pressed="true"]{background:#283e30;color:#fff;border-color:#283e30}dialog{border:1px solid #d0d4ca;border-radius:16px;padding:24px;max-width:340px;width:calc(100% - 32px);color:#242820;background:#f7f6f2}dialog::backdrop{background:#14201777}dialog h2{font-size:19px;margin:0 0 18px}dialog label{display:block;font-size:14px;margin-bottom:8px}dialog input{width:100%;font:inherit;padding:11px;border:1px solid #a9b19f;border-radius:8px;background:#fff}dialog .actions{margin-top:14px}#password-error{font-size:14px;min-height:20px;color:#a02e25;margin:10px 0 0}#unlock{background:#283e30;color:#fff}
+</style>
+</head>
+<body><main>
+<header><div><h1>Cidade Enlameada</h1><p class="hint">Clique nas ruas para pavimentar.</p></div><div class="stats" aria-live="polite"><div><span id="total" class="total">0</span> <span class="unit">pedras</span></div><div id="connection" class="connection" role="status" aria-atomic="true">Casas desconectadas</div></div></header>
+<div class="versions" role="group" aria-label="Escolher mapa"><button type="button" id="version-0" aria-pressed="true">Cidade 1</button><button type="button" id="version-1" aria-pressed="false">Cidade 2</button></div>
+<svg id="map" viewBox="0 0 680 520" role="group" aria-label="Mapa interativo com dez casas. Selecione as ruas com clique, Enter ou espaço."></svg>
+<div class="actions"><button id="clear" type="button">Limpar</button><button id="solution" type="button">Mostrar solução</button></div>
+</main>
+<dialog id="secret-dialog" aria-labelledby="secret-title"><form id="secret-form">
+<h2 id="secret-title">Mostrar solução</h2><label for="secret">Palavra secreta</label><input id="secret" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" required aria-describedby="password-error"><p id="password-error" role="alert"></p><div class="actions"><button id="cancel-secret" type="button">Cancelar</button><button id="unlock" type="submit">Mostrar</button></div>
+</form></dialog>
+<script>
+'use strict';
+const nodes={A:[198,55],B:[435,55],C:[625,128],D:[302,142],E:[66,237],F:[402,244],G:[246,360],H:[49,448],I:[382,475],J:[610,367]};
+let edges=[['A','B',5],['A','D',3],['A','E',4],['E','D',5],['E','G',4],['E','H',2],['H','G',3],['H','I',3],['G','D',4],['D','F',3],['B','D',3],['B','F',2],['B','J',4],['B','C',3],['C','J',2],['F','J',3],['F','I',3],['F','G',4],['G','I',2],['I','J',4]];
+const versions=[edges.map(e=>e[2]),[3,4,4,5,4,9,8,5,5,4,8,4,4,5,5,2,8,5,3,3]];
+let version=0;
+const selections=[new Set(),new Set()];
+let selected=selections[0];
+const svg=document.getElementById('map'),NS='http://www.w3.org/2000/svg';
+function el(tag,attrs,parent,text){const e=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);if(text!==undefined)e.textContent=text;parent.appendChild(e);return e}
+function evaluate(ids){const parent=Object.fromEntries(Object.keys(nodes).map(k=>[k,k]));function root(k){while(parent[k]!==k)k=parent[k];return k}let cost=0;for(const i of ids){const[a,b,w]=edges[i];parent[root(a)]=root(b);cost+=w}return {cost,groups:new Set(Object.keys(nodes).map(root)).size}}
+const groups=[];
+function draw(){svg.replaceChildren();groups.length=0;
+edges.forEach(([a,b,w],i)=>{const[x,y]=nodes[a],[u,v]=nodes[b];const g=el('g',{class:'edge',role:'button',tabindex:0,'aria-pressed':'false','aria-label':`Rua ${a} a ${b}, ${w} pedras`},svg);groups.push(g);el('line',{x1:x,y1:y,x2:u,y2:v,class:'road'},g);el('line',{x1:x,y1:y,x2:u,y2:v,class:'hit'},g);g.addEventListener('click',()=>toggle(i));g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle(i)}})});
+edges.forEach(([a,b,w],i)=>{const[x,y]=nodes[a],[u,v]=nodes[b];const g=el('g',{'pointer-events':'none'},svg);el('rect',{x:(x+u)/2-13,y:(y+v)/2-14,width:26,height:28,rx:6,class:'cost-bg'},g);el('text',{x:(x+u)/2,y:(y+v)/2,class:'cost'},g,w)});
+for(const[k,[x,y]]of Object.entries(nodes)){const g=el('g',{class:'node'},svg);el('path',{d:`M${x-19} ${y-10} L${x} ${y-26} L${x+19} ${y-10} Z`,class:'house'},g);el('rect',{x:x-14,y:y-10,width:28,height:29,rx:2,class:'house'},g);el('text',{x,y:y+5,class:'letter'},g,k)}
+}
+function update(){groups.forEach((g,i)=>{g.classList.toggle('selected',selected.has(i));g.setAttribute('aria-pressed',String(selected.has(i)))});const r=evaluate(selected);document.getElementById('total').textContent=r.cost;const c=document.getElementById('connection');c.textContent=r.groups===1?'✓ Todas as 10 casas conectadas':`Faltam conexões · ${r.groups} grupos`;c.classList.toggle('connected',r.groups===1)}
+function toggle(i){selected.has(i)?selected.delete(i):selected.add(i);update()}
+document.getElementById('clear').addEventListener('click',()=>{selected.clear();update()});
+function switchVersion(n){version=n;selected=selections[n];edges=edges.map(([a,b],i)=>[a,b,versions[n][i]]);document.getElementById('version-0').setAttribute('aria-pressed',String(n===0));document.getElementById('version-1').setAttribute('aria-pressed',String(n===1));draw();update()}
+document.getElementById('version-0').addEventListener('click',()=>switchVersion(0));
+document.getElementById('version-1').addEventListener('click',()=>switchVersion(1));
+const dialog=document.getElementById('secret-dialog'),password=document.getElementById('secret'),error=document.getElementById('password-error');
+document.getElementById('solution').addEventListener('click',()=>{password.value='';error.textContent='';dialog.showModal();password.focus()});
+document.getElementById('cancel-secret').addEventListener('click',()=>dialog.close());
+document.getElementById('secret-form').addEventListener('submit',e=>{e.preventDefault();if(password.value.trim().toLowerCase()!=='barro'){error.textContent='Palavra incorreta.';password.select();return}selected.clear();(version===0?[1,5,6,9,11,13,14,16,18]:[0,1,2,4,7,13,15,18,19]).forEach(i=>selected.add(i));update();password.value='';dialog.close()});
+draw();update();
+</script></body></html>
